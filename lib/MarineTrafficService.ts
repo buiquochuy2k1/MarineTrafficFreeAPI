@@ -28,11 +28,11 @@ interface VesselPosition {
 }
 
 interface VesselVoyage {
-  [key: string]: any; // dữ liệu trả về phức tạp, bạn có thể định nghĩa chi tiết sau
+  [key: string]: any;
 }
 
 interface VesselSummary {
-  [key: string]: any; // dữ liệu trả về phức tạp, bạn có thể định nghĩa chi tiết sau
+  [key: string]: any;
 }
 
 interface FetchResult<T> {
@@ -66,7 +66,8 @@ export class MarineTrafficService {
 
   private getRequestHeaders() {
     return {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
       Accept: "application/json, text/plain, */*",
       "Accept-Language": "en-US,en;q=0.5",
       "X-Requested-With": "XMLHttpRequest",
@@ -74,14 +75,37 @@ export class MarineTrafficService {
     };
   }
 
+  /** Helper: gọi axios và retry tối đa 2 lần nếu 403 */
+  private async requestWithRetry<T>(url: string): Promise<AxiosResponse<T>> {
+    const maxRetries = 2;
+    let attempt = 0;
+    let lastError: any;
+
+    while (attempt <= maxRetries) {
+      try {
+        const response = await axios.get<T>(url, {
+          headers: this.getRequestHeaders(),
+          timeout: 30000,
+        });
+        return response;
+      } catch (error: any) {
+        lastError = error;
+        if (error.response?.status === 403 && attempt < maxRetries) {
+          attempt++;
+          console.warn(`⚠️ 403 Forbidden, retrying (${attempt}/${maxRetries})...`);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
   async fetchVesselGeneral(vesselId: string): Promise<FetchResult<VesselGeneral>> {
     const url = `https://www.marinetraffic.com/en/vessels/${vesselId}/general`;
     try {
-      const response: AxiosResponse<any> = await axios.get(url, {
-        headers: this.getRequestHeaders(),
-        timeout: 30000,
-      });
-
+      const response = await this.requestWithRetry<any>(url);
       return {
         vessel: {
           shipId: response.data.shipId,
@@ -98,7 +122,9 @@ export class MarineTrafficService {
       };
     } catch (error: any) {
       throw new Error(
-        `Failed to fetch vessel general data: ${error.response?.status} ${error.response?.statusText || error.message}`
+        `Failed to fetch vessel general data: ${error.response?.status} ${
+          error.response?.statusText || error.message
+        }`
       );
     }
   }
@@ -106,11 +132,7 @@ export class MarineTrafficService {
   async fetchVesselPosition(vesselId: string): Promise<FetchResult<VesselPosition>> {
     const url = `https://www.marinetraffic.com/en/vessels/${vesselId}/position`;
     try {
-      const response: AxiosResponse<any> = await axios.get(url, {
-        headers: this.getRequestHeaders(),
-        timeout: 30000,
-      });
-
+      const response = await this.requestWithRetry<any>(url);
       return {
         position: {
           shipId: response.data.shipId,
@@ -125,7 +147,9 @@ export class MarineTrafficService {
       };
     } catch (error: any) {
       throw new Error(
-        `Failed to fetch vessel position data: ${error.response?.status} ${error.response?.statusText || error.message}`
+        `Failed to fetch vessel position data: ${error.response?.status} ${
+          error.response?.statusText || error.message
+        }`
       );
     }
   }
@@ -133,10 +157,7 @@ export class MarineTrafficService {
   async fetchVesselVoyage(vesselId: string): Promise<FetchResult<VesselVoyage>> {
     const url = `https://www.marinetraffic.com/en/vessels/${vesselId}/voyage`;
     try {
-      const response: AxiosResponse<any> = await axios.get(url, {
-        headers: this.getRequestHeaders(),
-        timeout: 30000,
-      });
+      const response = await this.requestWithRetry<any>(url);
       return {
         voyage: response.data,
         success: true,
@@ -144,7 +165,9 @@ export class MarineTrafficService {
       };
     } catch (error: any) {
       throw new Error(
-        `Failed to fetch vessel voyage data: ${error.response?.status} ${error.response?.statusText || error.message}`
+        `Failed to fetch vessel voyage data: ${error.response?.status} ${
+          error.response?.statusText || error.message
+        }`
       );
     }
   }
@@ -152,10 +175,7 @@ export class MarineTrafficService {
   async fetchVesselSummary(vesselId: string): Promise<FetchResult<VesselSummary>> {
     const url = `https://www.marinetraffic.com/en/vessels/${vesselId}/summary`;
     try {
-      const response: AxiosResponse<any> = await axios.get(url, {
-        headers: this.getRequestHeaders(),
-        timeout: 30000,
-      });
+      const response = await this.requestWithRetry<any>(url);
       return {
         summary: response.data,
         success: true,
@@ -163,7 +183,9 @@ export class MarineTrafficService {
       };
     } catch (error: any) {
       throw new Error(
-        `Failed to fetch vessel summary data: ${error.response?.status} ${error.response?.statusText || error.message}`
+        `Failed to fetch vessel summary data: ${error.response?.status} ${
+          error.response?.statusText || error.message
+        }`
       );
     }
   }
@@ -184,13 +206,21 @@ export class MarineTrafficService {
       };
 
       result.data.general =
-        general.status === "fulfilled" ? general.value.vessel : { error: (general.reason as Error).message };
+        general.status === "fulfilled"
+          ? general.value.vessel
+          : { error: (general.reason as Error).message };
       result.data.position =
-        position.status === "fulfilled" ? position.value.position : { error: (position.reason as Error).message };
+        position.status === "fulfilled"
+          ? position.value.position
+          : { error: (position.reason as Error).message };
       result.data.voyage =
-        voyage.status === "fulfilled" ? voyage.value.voyage : { error: (voyage.reason as Error).message };
+        voyage.status === "fulfilled"
+          ? voyage.value.voyage
+          : { error: (voyage.reason as Error).message };
       result.data.summary =
-        summary.status === "fulfilled" ? summary.value.summary : { error: (summary.reason as Error).message };
+        summary.status === "fulfilled"
+          ? summary.value.summary
+          : { error: (summary.reason as Error).message };
 
       return result;
     } catch (error: any) {
